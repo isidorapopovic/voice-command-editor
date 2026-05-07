@@ -274,3 +274,49 @@ function Editor() {
     </div>
   );
 }
+
+function ExportButton({ plan, videoUrl }: { plan: Plan; videoUrl: string }) {
+  const [url, setUrl] = useState(() => localStorage.getItem("renderServerUrl") ?? "");
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+
+  const exportVideo = async () => {
+    if (!url) {
+      const u = window.prompt("Render server URL (e.g. https://your-server.up.railway.app)");
+      if (!u) return;
+      localStorage.setItem("renderServerUrl", u);
+      setUrl(u);
+      return;
+    }
+    setBusy(true);
+    setErr(null);
+    try {
+      const blob = await fetch(videoUrl).then((r) => r.blob());
+      const fd = new FormData();
+      fd.append("video", blob, "input.mp4");
+      fd.append("plan", JSON.stringify(plan));
+      const res = await fetch(url.replace(/\/$/, "") + "/render", { method: "POST", body: fd });
+      if (!res.ok) throw new Error(await res.text());
+      const out = await res.blob();
+      const dl = URL.createObjectURL(out);
+      const a = document.createElement("a");
+      a.href = dl;
+      a.download = "edited.mp4";
+      a.click();
+      URL.revokeObjectURL(dl);
+    } catch (e: any) {
+      setErr(e.message ?? String(e));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <>
+      <button className={btnPrimary} onClick={exportVideo} disabled={busy || !plan.actions.length}>
+        {busy ? "Rendering…" : "Export video"}
+      </button>
+      {err && <span className="text-xs text-red-600">{err}</span>}
+    </>
+  );
+}
