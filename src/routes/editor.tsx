@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { parseVoiceCommand } from "@/server/voice.functions";
+import { parseVoiceCommand } from "@/utils/voice.functions";
 
 export const Route = createFileRoute("/editor")({
   head: () => ({
