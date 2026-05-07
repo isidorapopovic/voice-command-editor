@@ -234,6 +234,7 @@ function Editor() {
               <button className={btnGhost} onClick={() => setPlan({ actions: [] })} disabled={!plan.actions.length}>
                 Clear edits
               </button>
+              <ExportButton plan={plan} videoUrl={videoUrl} />
             </div>
 
             <div className="flex gap-2">
