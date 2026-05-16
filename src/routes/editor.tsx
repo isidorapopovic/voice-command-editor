@@ -2,7 +2,6 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { parseVoiceCommand } from "@/utils/voice.functions";
 import { EditTimeline } from "@/components/EditTimeline";
-import { HistoryPanel } from "@/components/HistoryPanel";
 
 export const Route = createFileRoute("/editor")({
   head: () => ({
@@ -106,6 +105,28 @@ function Editor() {
     setTranscript("");
   };
 
+  const saveToNeon = async (payload: {
+    command: string;
+    transcript: string;
+    edit_plan: { actions: Action[] };
+    input_filename?: string;
+    audioBase64?: string;
+    mimeType?: string;
+  }) => {
+    const base = localStorage.getItem("neonBackendUrl");
+    if (!base) return; // not configured yet — skip silently
+    const path = localStorage.getItem("neonBackendSavePath") ?? "/sessions";
+    try {
+      await fetch(base.replace(/\/$/, "") + path, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ...payload, status: "done", created_at: new Date().toISOString() }),
+      });
+    } catch (e) {
+      console.warn("Save to Neon failed", e);
+    }
+  };
+
   const submitText = async () => {
     if (!text.trim()) return;
     setBusy(true);
@@ -113,7 +134,9 @@ function Editor() {
     try {
       const res = await parseVoiceCommand({ data: { text } });
       setTranscript(res.transcript);
-      setPlan({ actions: [...plan.actions, ...res.plan.actions] });
+      const nextPlan = { actions: [...plan.actions, ...res.plan.actions] };
+      setPlan(nextPlan);
+      saveToNeon({ command: text, transcript: res.transcript, edit_plan: nextPlan });
       setText("");
     } catch (e: any) {
       setError(e.message ?? String(e));
@@ -131,7 +154,15 @@ function Editor() {
         data: { audioBase64, mimeType: blob.type || "audio/webm" },
       });
       setTranscript(res.transcript);
-      setPlan({ actions: [...plan.actions, ...res.plan.actions] });
+      const nextPlan = { actions: [...plan.actions, ...res.plan.actions] };
+      setPlan(nextPlan);
+      saveToNeon({
+        command: "[voice]",
+        transcript: res.transcript,
+        edit_plan: nextPlan,
+        audioBase64,
+        mimeType: blob.type || "audio/webm",
+      });
     } catch (e: any) {
       setError(e.message ?? String(e));
     } finally {
