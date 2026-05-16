@@ -293,7 +293,7 @@ function Editor() {
 
             <EditTimeline actions={plan.actions} duration={duration} />
 
-            <HistoryPanel onApplyPlan={(p) => setPlan({ actions: [...plan.actions, ...p.actions] })} />
+            <BackendUrlConfig />
 
             <details className="rounded-md bg-black/5 p-3 text-xs">
               <summary className="cursor-pointer font-semibold">Raw edit plan JSON</summary>
