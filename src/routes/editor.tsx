@@ -1,6 +1,8 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { parseVoiceCommand } from "@/utils/voice.functions";
+import { EditTimeline } from "@/components/EditTimeline";
+import { HistoryPanel } from "@/components/HistoryPanel";
 
 export const Route = createFileRoute("/editor")({
   head: () => ({
@@ -258,16 +260,14 @@ function Editor() {
               </p>
             )}
 
-            <section>
-              <h2 className="mb-2 text-lg font-semibold">Edit plan</h2>
-              {plan.actions.length === 0 ? (
-                <p className="text-sm opacity-70">No edits yet.</p>
-              ) : (
-                <pre className="overflow-auto rounded-md bg-black/5 p-3 text-xs">
-{JSON.stringify(plan, null, 2)}
-                </pre>
-              )}
-            </section>
+            <EditTimeline actions={plan.actions} duration={duration} />
+
+            <HistoryPanel onApplyPlan={(p) => setPlan({ actions: [...plan.actions, ...p.actions] })} />
+
+            <details className="rounded-md bg-black/5 p-3 text-xs">
+              <summary className="cursor-pointer font-semibold">Raw edit plan JSON</summary>
+              <pre className="mt-2 overflow-auto">{JSON.stringify(plan, null, 2)}</pre>
+            </details>
           </div>
         )}
       </div>
