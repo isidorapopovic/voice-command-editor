@@ -2,7 +2,6 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { parseVoiceCommand } from "@/utils/voice.functions";
 import { EditTimeline } from "@/components/EditTimeline";
-import { HistoryPanel } from "@/components/HistoryPanel";
 
 export const Route = createFileRoute("/editor")({
   head: () => ({
@@ -106,6 +105,28 @@ function Editor() {
     setTranscript("");
   };
 
+  const saveToNeon = async (payload: {
+    command: string;
+    transcript: string;
+    edit_plan: { actions: Action[] };
+    input_filename?: string;
+    audioBase64?: string;
+    mimeType?: string;
+  }) => {
+    const base = localStorage.getItem("neonBackendUrl");
+    if (!base) return; // not configured yet — skip silently
+    const path = localStorage.getItem("neonBackendSavePath") ?? "/sessions";
+    try {
+      await fetch(base.replace(/\/$/, "") + path, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ...payload, status: "done", created_at: new Date().toISOString() }),
+      });
+    } catch (e) {
+      console.warn("Save to Neon failed", e);
+    }
+  };
+
   const submitText = async () => {
     if (!text.trim()) return;
     setBusy(true);
@@ -113,7 +134,9 @@ function Editor() {
     try {
       const res = await parseVoiceCommand({ data: { text } });
       setTranscript(res.transcript);
-      setPlan({ actions: [...plan.actions, ...res.plan.actions] });
+      const nextPlan = { actions: [...plan.actions, ...res.plan.actions] };
+      setPlan(nextPlan);
+      saveToNeon({ command: text, transcript: res.transcript, edit_plan: nextPlan });
       setText("");
     } catch (e: any) {
       setError(e.message ?? String(e));
@@ -131,7 +154,15 @@ function Editor() {
         data: { audioBase64, mimeType: blob.type || "audio/webm" },
       });
       setTranscript(res.transcript);
-      setPlan({ actions: [...plan.actions, ...res.plan.actions] });
+      const nextPlan = { actions: [...plan.actions, ...res.plan.actions] };
+      setPlan(nextPlan);
+      saveToNeon({
+        command: "[voice]",
+        transcript: res.transcript,
+        edit_plan: nextPlan,
+        audioBase64,
+        mimeType: blob.type || "audio/webm",
+      });
     } catch (e: any) {
       setError(e.message ?? String(e));
     } finally {
@@ -262,7 +293,7 @@ function Editor() {
 
             <EditTimeline actions={plan.actions} duration={duration} />
 
-            <HistoryPanel onApplyPlan={(p) => setPlan({ actions: [...plan.actions, ...p.actions] })} />
+            <BackendUrlConfig />
 
             <details className="rounded-md bg-black/5 p-3 text-xs">
               <summary className="cursor-pointer font-semibold">Raw edit plan JSON</summary>
@@ -320,3 +351,48 @@ function ExportButton({ plan, videoUrl }: { plan: Plan; videoUrl: string }) {
     </>
   );
 }
+
+function BackendUrlConfig() {
+  const [url, setUrl] = useState(() => localStorage.getItem("neonBackendUrl") ?? "");
+  const [path, setPath] = useState(() => localStorage.getItem("neonBackendSavePath") ?? "/sessions");
+  const [saved, setSaved] = useState(false);
+
+  const save = () => {
+    localStorage.setItem("neonBackendUrl", url);
+    localStorage.setItem("neonBackendSavePath", path);
+    setSaved(true);
+    setTimeout(() => setSaved(false), 1500);
+  };
+
+  return (
+    <details className="rounded-md border border-black/15 bg-white/50 p-3 text-xs">
+      <summary className="cursor-pointer font-semibold">
+        Neon backend {url ? "✓ configured" : "(not configured)"}
+      </summary>
+      <p className="mt-2 opacity-70">
+        Each voice or text command will POST to <code>{`{URL}{path}`}</code> with command, transcript, edit_plan, and audio (base64).
+      </p>
+      <div className="mt-2 flex flex-wrap gap-2">
+        <input
+          value={url}
+          onChange={(e) => setUrl(e.target.value)}
+          placeholder="https://your-python-api.example.com"
+          className="flex-1 min-w-[220px] rounded-md border border-black/30 bg-white px-2 py-1"
+        />
+        <input
+          value={path}
+          onChange={(e) => setPath(e.target.value)}
+          placeholder="/sessions"
+          className="w-32 rounded-md border border-black/30 bg-white px-2 py-1"
+        />
+        <button
+          className="inline-flex items-center justify-center rounded-md bg-black px-3 py-1 font-semibold text-white"
+          onClick={save}
+        >
+          {saved ? "Saved" : "Save"}
+        </button>
+      </div>
+    </details>
+  );
+}
+
